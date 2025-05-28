@@ -1,0 +1,12 @@
+{
+    "python.defaultInterpreterPath": "D:/Program Files/anaconda3/envs/nlp/python.exe",
+
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+	"editor.tabSize": 4,				// 编辑器中 Tab 键代表的空格数。Python PEP 8 推荐 4 个空格。
+	"editor.insertSpaces": true,		// 按 Tab 键时是否插入空格而不是制表符。对于 Python，这应始终为 true。
+  	//"editor.rulers": [88, 100],			// 在编辑器中显示的垂直标尺的位置 (字符数)。
+  	"files.trimTrailingWhitespace": true,			// 保存文件时是否自动删除行尾多余的空格。
+  	"files.insertFinalNewline": true,				// 保存文件时是否确保文件末尾有一个空行。
+  	"files.eol": "\r\n",								// 定义文件的默认行尾序列。
+}

@@ -83,7 +83,7 @@ class ModelConfig(object):
     def finalize(self, tags):
         self.enrichTags(tags)
 
-        self.user = os.getenv("USER")
+        self.user = os.getenv("USER") or os.getenv("USERNAME")          # 跨平台处理
         if self.user is None or len(self.user) == 0:
             raise ValueError("User not found")
         if self.root is None:

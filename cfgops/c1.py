@@ -14,14 +14,14 @@ def mcfg(tags):
     mcfg.testSplitName = "test" # DO NOT MODIFY
 
     # data setup
-    mcfg.imageDir = "/auto/cvdata/mar20/images"
-    mcfg.annotationDir = "/auto/cvdata/mar20/annotations"
+    mcfg.imageDir = "../cvdata/mar20/images"
+    mcfg.annotationDir = "../cvdata/mar20/annotations"
     mcfg.classList = ["A{}".format(x) for x in range(1, 21)] # DO NOT MODIFY
-    mcfg.subsetMap = { # DO NOT MODIFY
-        "train": "/auto/cvdata/mar20/splits/v5/train.txt",
-        "validation": "/auto/cvdata/mar20/splits/v5/validation.txt",
-        "test": "/auto/cvdata/mar20/splits/v5/test.txt",
-        "small": "/auto/cvdata/mar20/splits/v5/small.txt",
+    mcfg.subsetMap = { # DO NOT MODIFY          #! 必须修改，windows下无法使用unix文件系统
+        "train": "cvdata/mar20/splits/v5/train.txt",
+        "validation": "cvdata/mar20/splits/v5/validation.txt",
+        "test": "cvdata/mar20/splits/v5/test.txt",
+        "small": "cvdata/mar20/splits/v5/small.txt",
     }
 
     if "full" in tags:
