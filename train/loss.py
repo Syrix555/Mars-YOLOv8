@@ -107,10 +107,116 @@ class DetectionLoss(object):
         gtLabels, gtBboxes = targets.split((1, 4), 2)  # cls=(batchSize, maxCount, 1), xyxy=(batchSize, maxCount, 4)
         gtMask = gtBboxes.sum(2, keepdim=True).gt_(0.0)
 
-        raise NotImplementedError("DetectionLoss::__call__")
+        # raise NotImplementedError("DetectionLoss::__call__")
+
+        # 在DetectionLoss类的__call__方法中，替换NotImplementedError的部分
+
+def __call__(self, preds, targets):
+    """
+    preds shape:
+        preds[0]: (B, regMax * 4 + nc, 80, 80)
+        preds[1]: (B, regMax * 4 + nc, 40, 40)
+        preds[2]: (B, regMax * 4 + nc, 20, 20)
+    targets shape:
+        (?, 6)
+    """
+    loss = torch.zeros(3, device=self.mcfg.device)  # box, cls, dfl
+
+    batchSize = preds[0].shape[0]
+    no = self.mcfg.nc + self.mcfg.regMax * 4
+
+    # predictioin preprocess
+    predBoxDistribution, predClassScores = torch.cat([xi.view(batchSize, no, -1) for xi in preds], 2).split((self.mcfg.regMax * 4, self.mcfg.nc), 1)
+    predBoxDistribution = predBoxDistribution.permute(0, 2, 1).contiguous() # (batchSize, 80 * 80 + 40 * 40 + 20 * 20, regMax * 4)
+    predClassScores = predClassScores.permute(0, 2, 1).contiguous() # (batchSize, 80 * 80 + 40 * 40 + 20 * 20, nc)
+
+    # ground truth preprocess
+    targets = self.preprocess(targets.to(self.mcfg.device), batchSize, scaleTensor=self.model.scaleTensor) # (batchSize, maxCount, 5)
+    gtLabels, gtBboxes = targets.split((1, 4), 2)  # cls=(batchSize, maxCount, 1), xyxy=(batchSize, maxCount, 4)
+    gtMask = gtBboxes.sum(2, keepdim=True).gt_(0.0)
+
+    # ===================== 补全部分开始 =====================
+
+    # 1. 生成anchor points（锚点）
+    anchorPoints, stridesTensor = self.makeAnchors(preds, self.layerStrides, 0.5)
+
+    # 2. 将预测的分布转换为边界框坐标
+    predBboxes = self.distToBbox(predBoxDistribution, anchorPoints.unsqueeze(0))
+
+    # 3. 使用TaskAlignedAssigner进行正负样本分配
+    _, targetBboxes, targetScores, fgMask, _ = self.assigner(
+        predClassScores.detach().sigmoid(),  # 预测的类别分数（detach防止梯度传播）
+        (predBboxes.detach() * stridesTensor).type(gtBboxes.dtype),  # 预测的边界框
+        anchorPoints * stridesTensor,  # 锚点坐标
+        gtLabels,  # 真实类别标签
+        gtBboxes,  # 真实边界框
+        gtMask  # 有效目标掩码
+    )
+
+    # 4. 计算目标分数总和（用于归一化）
+    targetScoresSum = max(targetScores.sum(), 1)
+
+    # 5. 计算分类损失（BCE Loss）
+    # 对所有预测进行分类损失计算
+    loss[1] = self.bce(predClassScores, targetScores.to(predClassScores.dtype)).sum() / targetScoresSum
+
+    # 6. 计算边界框损失（只对正样本）
+    if fgMask.sum():
+        # 将预测边界框转换到原始图像尺度
+        targetBboxes /= stridesTensor
+
+        # 计算IoU损失和DFL损失
+        loss[0], loss[2] = self.bboxLoss(
+            predBoxDistribution,  # 预测的分布
+            predBboxes,  # 预测的边界框
+            anchorPoints,  # 锚点
+            targetBboxes,  # 目标边界框
+            targetScores,  # 目标分数
+            targetScoresSum,  # 目标分数总和
+            fgMask  # 前景掩码
+        )
+
+    # ===================== 补全部分结束 =====================
 
         loss[0] *= self.mcfg.lossWeights[0]  # box
         loss[1] *= self.mcfg.lossWeights[1]  # cls
         loss[2] *= self.mcfg.lossWeights[2]  # dfl
 
         return loss.sum()
+
+# 需要添加的辅助方法
+
+def makeAnchors(self, feats, strides, grid_cell_offset=0.5):
+    """生成锚点坐标"""
+    anchor_points, stride_tensor = [], []
+    assert feats is not None
+    dtype, device = feats[0].dtype, feats[0].device
+
+    for i, stride in enumerate(strides):
+        _, _, h, w = feats[i].shape
+        sx = torch.arange(end=w, device=device, dtype=dtype) + grid_cell_offset  # shift x
+        sy = torch.arange(end=h, device=device, dtype=dtype) + grid_cell_offset  # shift y
+        sy, sx = torch.meshgrid(sy, sx, indexing='ij')
+        anchor_points.append(torch.stack((sx, sy), -1).view(-1, 2))
+        stride_tensor.append(torch.full((h * w, 1), stride, dtype=dtype, device=device))
+
+    return torch.cat(anchor_points), torch.cat(stride_tensor)
+
+
+def distToBbox(self, distance, anchor_points, xywh=True, dim=-1):
+    """将分布预测转换为边界框坐标"""
+    # distance shape: (batch_size, num_anchors, reg_max * 4)
+    # anchor_points shape: (batch_size, num_anchors, 2)
+
+    # 将分布转换为距离值
+    lt, rb = distance.chunk(2, dim)  # left-top, right-bottom
+    x1y1 = anchor_points - lt  # 左上角
+    x2y2 = anchor_points + rb  # 右下角
+
+    if xywh:
+        # 转换为中心点+宽高格式
+        c_xy = (x1y1 + x2y2) / 2
+        wh = x2y2 - x1y1
+        return torch.cat((c_xy, wh), dim)  # xywh
+    else:
+        return torch.cat((x1y1, x2y2), dim)  # xyxy
