@@ -14,8 +14,8 @@ def mcfg(tags):
     mcfg.testSplitName = "test" # DO NOT MODIFY
 
     # data setup
-    mcfg.imageDir = "../cvdata/mar20/images"
-    mcfg.annotationDir = "../cvdata/mar20/annotations"
+    mcfg.imageDir = "cvdata/mar20/images"
+    mcfg.annotationDir = "cvdata/mar20/annotations"
     mcfg.classList = ["A{}".format(x) for x in range(1, 21)] # DO NOT MODIFY
     mcfg.subsetMap = { # DO NOT MODIFY          #! 必须修改，windows下无法使用unix文件系统
         "train": "cvdata/mar20/splits/v5/train.txt",
