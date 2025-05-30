@@ -38,7 +38,7 @@ class ModelConfig(object):
         self.maxEpoch = 200
         self.backboneFreezeEpochs = []
         self.distilEpochs = []
-        self.batchSize = 16
+        self.batchSize = 32
         self.optimizerType = "SGD"
         self.optimizerMomentum = 0.937
         self.optimizerWeightDecay = 5e-4
