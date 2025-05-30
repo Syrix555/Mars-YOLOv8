@@ -165,7 +165,8 @@ class DetectionLoss(object):
         dtype, device = feats[0].dtype, feats[0].device
 
         for i, stride in enumerate(strides):
-            _, _, h, w = feats[i].shape
+            # _, _, h, w = feats[i].shape
+            h, w = feats[i].shape[2:] if isinstance(feats, list) else (int(feats[i][0]), int(feats[i][1]))
             sx = torch.arange(end=w, device=device, dtype=dtype) + grid_cell_offset  # shift x
             sy = torch.arange(end=h, device=device, dtype=dtype) + grid_cell_offset  # shift y
             sy, sx = torch.meshgrid(sy, sx, indexing='ij')
@@ -175,7 +176,7 @@ class DetectionLoss(object):
         return torch.cat(anchor_points), torch.cat(stride_tensor)
 
 
-    def distToBbox(self, distance, anchor_points, xywh=True, dim=-1):
+    def distToBbox(self, distance, anchor_points, xywh=False, dim=-1):
         """将分布预测转换为边界框坐标"""
         # distance shape: (batch_size, num_anchors, reg_max * 4)
         # anchor_points shape: (batch_size, num_anchors, 2) 或 (num_anchors, 2)
