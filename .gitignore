@@ -13,3 +13,4 @@ dist
 *.log
 CMakeLists.txt
 dask-worker-space
+eval
