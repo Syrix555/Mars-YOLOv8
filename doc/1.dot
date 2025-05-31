@@ -1,0 +1,84 @@
+digraph PositiveSampleMatching {
+    rankdir=TD; // 从上到下布局
+    node [shape=box, style="rounded,filled", fontname="Microsoft YaHei"]; // 默认节点样式
+    edge [fontname="Microsoft YaHei"];
+
+    // 开始和输入节点
+    start [label="开始: 训练迭代\n获取单批数据", shape=ellipse, fillcolor=lightcoral];
+    input_preds [label="模型预测输出 `preds`\n(来自Head的3个尺度)", shape=parallelogram, fillcolor=lightblue];
+    input_targets [label="真实标签 `targets`\n(B, N, 6)", shape=parallelogram, fillcolor=lightskyblue];
+
+    // 步骤1: 预测预处理
+    subgraph cluster_pred_proc {
+        label="1. 预测预处理";
+        fillcolor=whitesmoke;
+        style=filled;
+        pred_proc_concat_view [label="合并各尺度`preds`并调整形状\n(B, C, H*W)"];
+        pred_proc_split [label="Split为:\n- `predBoxDistribution` (B,总锚点数,4*regMax)\n- `predClassScores` (B,总锚点数,nc)"];
+        pred_proc_permute [label="Permute调整维度\n(B, 总锚点数, Channels)"];
+    }
+
+    // 步骤2: 真实标签预处理
+    subgraph cluster_gt_proc {
+        label="2. 真实标签预处理";
+        fillcolor=whitesmoke;
+        style=filled;
+        gt_proc_call [label="调用 `self.preprocess(targets, scaleTensor)`"];
+        gt_proc_output [label="输出:\n- `gtLabels` (B,M,1)\n- `gtBboxes` (B,M,4) (图像尺度)\n- `gtMask`"];
+    }
+
+    // 步骤3 & 4: 锚点与预测框生成
+    subgraph cluster_anchor_pred_gen {
+        label="3 & 4. 锚点与预测框生成";
+        fillcolor=whitesmoke;
+        style=filled;
+        make_anchors_call [label="调用 `self.makeAnchors(preds, layerStrides)`"];
+        make_anchors_output [label="输出:\n- `anchorPoints` (总锚点数,2) (特征图尺度)\n- `stridesTensor` (总锚点数,1)"];
+        dist_to_bbox_call [label="调用 `self.distToBbox(predBoxDistribution, anchorPoints)`"];
+        dist_to_bbox_output [label="输出:\n- `predBboxes` (B,总锚点数,4) (特征图尺度)"];
+    }
+
+    // 步骤5: 核心匹配
+    subgraph cluster_assignment {
+        label="5. 核心匹配";
+        fillcolor=lightgoldenrodyellow;
+        style="filled,rounded";
+        assigner_inputs_prep [label="准备Assigner输入:\n- `predClassScores.detach().sigmoid()`\n- `(predBboxes.detach() * stridesTensor)` (转图像尺度)\n- `anchorPoints * stridesTensor` (转图像尺度)\n- `gtLabels`, `gtBboxes`, `gtMask`"];
+        assigner_call [label="**调用 `TaskAlignedAssigner` 执行正负样本匹配**\n(内部计算对齐度量, 为每个GT选TopK预测)", style="filled,bold", fillcolor=deepskyblue, shape=box3d];
+        assigner_outputs [label="输出匹配结果:\n- `targetBboxes` (分配给正样本的GT框, 图像尺度)\n- `targetScores` (所有预测的目标类别分数)\n- `fgMask` (前景掩码, 标记正样本)"];
+    }
+
+    // 结束节点
+    end_node [label="正样本匹配完成\n(结果用于后续损失计算)", shape=ellipse, fillcolor=lightcoral];
+
+    // 定义流程边
+    start -> input_preds;
+    start -> input_targets;
+
+    input_preds -> pred_proc_concat_view;
+    pred_proc_concat_view -> pred_proc_split;
+    pred_proc_split -> pred_proc_permute;
+
+    input_targets -> gt_proc_call;
+    gt_proc_call -> gt_proc_output;
+
+    // makeAnchors 使用 preds 获取形状信息
+    input_preds -> make_anchors_call [style=dashed, label="获取形状"];
+    make_anchors_call -> make_anchors_output;
+
+    // distToBbox 使用 predBoxDistribution 和 anchorPoints
+    pred_proc_permute -> dist_to_bbox_call [label="predBoxDistribution"];
+    make_anchors_output -> dist_to_bbox_call [label="anchorPoints"];
+    dist_to_bbox_call -> dist_to_bbox_output;
+
+    // TaskAlignedAssigner 的输入依赖
+    pred_proc_permute -> assigner_inputs_prep [label="predClassScores"];
+    dist_to_bbox_output -> assigner_inputs_prep [label="predBboxes"];
+    make_anchors_output -> assigner_inputs_prep [label="anchorPoints, stridesTensor"];
+    gt_proc_output -> assigner_inputs_prep [label="gtLabels, gtBboxes, gtMask"];
+
+    assigner_inputs_prep -> assigner_call;
+    assigner_call -> assigner_outputs;
+
+    assigner_outputs -> end_node;
+}
