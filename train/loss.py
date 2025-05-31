@@ -212,3 +212,190 @@ class DetectionLoss(object):
             return torch.cat((c_xy, wh), dim=-1)  # xywh
         else:
             return torch.cat((x1y1, x2y2), dim=-1)  # xyxy
+
+class CWDLoss(nn.Module):
+    def __init__(self,
+                 temperature: float = 1.0,
+                 spatial_kl_reduction: str = 'batchmean'):
+        super().__init__()
+        self.temperature = temperature
+        self.kl_div_loss = nn.KLDivLoss(reduction=spatial_kl_reduction)
+        # print(f"CWDLoss initialized with: temperature={temperature}, "
+        #       f"spatial_kl_reduction='{spatial_kl_reduction}'")
+
+    def _resize_if_needed(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor) -> torch.Tensor:
+        if student_feat.shape[2:] != teacher_feat.shape[2:]:
+            teacher_feat = F.interpolate(teacher_feat,
+                                         size=student_feat.shape[2:],
+                                         mode='bilinear',
+                                         align_corners=False)
+        return teacher_feat
+
+    def forward(self,
+                student_features_list: list[torch.Tensor],
+                teacher_features_list: list[torch.Tensor]) -> torch.Tensor:
+        # Determine device from the first valid tensor in student_features_list or teacher_features_list
+        device = 'cpu' # Default device
+        if student_features_list and student_features_list[0] is not None:
+            device = student_features_list[0].device
+        elif teacher_features_list and teacher_features_list[0] is not None:
+            device = teacher_features_list[0].device
+
+        if not student_features_list:
+            return torch.tensor(0.0, device=device)
+
+        total_cwd_loss = torch.tensor(0.0, device=device)
+
+        if not teacher_features_list:
+            return total_cwd_loss
+
+        if len(student_features_list) != len(teacher_features_list):
+            # print(f"  Warning (CWDLoss): 学生 ({len(student_features_list)}) 和教师 ({len(teacher_features_list)}) "
+            #       f"特征层级数量不匹配。跳过CWD计算。")
+            return total_cwd_loss
+
+        num_valid_levels = 0
+        for s_feat, t_feat in zip(student_features_list, teacher_features_list):
+            if s_feat is None or t_feat is None:
+                continue
+            if s_feat.ndim != 4 or t_feat.ndim != 4 or s_feat.numel() == 0 or t_feat.numel() == 0:
+                continue
+
+            B_s, C_s, H_s, W_s = s_feat.shape
+            B_t, C_t, _, _ = t_feat.shape
+
+            if B_s != B_t: continue
+            if C_s != C_t: continue
+            if C_s == 0: continue
+            if H_s * W_s == 0: continue
+
+
+            t_feat_aligned = self._resize_if_needed(s_feat, t_feat)
+            s_feat_flat = s_feat.view(B_s, C_s, H_s * W_s)
+            t_feat_flat = t_feat_aligned.view(B_t, C_s, H_s * W_s)
+
+            log_student_spatial_dist = F.log_softmax(s_feat_flat / self.temperature, dim=2)
+            teacher_spatial_dist = F.softmax(t_feat_flat / self.temperature, dim=2)
+
+            kl_loss_per_level = self.kl_div_loss(
+                log_student_spatial_dist.view(-1, H_s * W_s),
+                teacher_spatial_dist.view(-1, H_s * W_s)
+            )
+            total_cwd_loss += kl_loss_per_level * (self.temperature ** 2)
+            num_valid_levels += 1
+
+        if num_valid_levels > 0:
+            final_loss = total_cwd_loss / num_valid_levels
+        else:
+            final_loss = total_cwd_loss # 保持为0
+        return final_loss
+
+class KLDivergenceLoss(nn.Module):
+    def __init__(self, temperature=1.0, reduction='batchmean'):
+        super().__init__()
+        self.temperature = temperature
+        self.kl_div = nn.KLDivLoss(reduction=reduction)
+        # print(f"KLDivergenceLoss initialized with temperature={temperature}, reduction='{reduction}'")
+
+    def forward(self, student_logits, teacher_logits):
+        if student_logits.numel() == 0 or teacher_logits.numel() == 0:
+            return torch.tensor(0.0, device=student_logits.device if student_logits.numel() > 0 else teacher_logits.device)
+
+        soft_targets = F.softmax(teacher_logits / self.temperature, dim=-1)
+        log_soft_student_outputs = F.log_softmax(student_logits / self.temperature, dim=-1)
+        loss = self.kl_div(log_soft_student_outputs, soft_targets)
+        return loss * (self.temperature ** 2)
+
+class ResponseLoss(nn.Module):
+    """
+    计算学生模型和教师模型在分类响应上的KL散度损失。
+    响应通常是来自检测头不同层级的特征图。
+    """
+    def __init__(self, device, nc, teacher_class_indexes, reg_max, temperature=1.0, reduction='batchmean'):
+        """
+        初始化 ResponseLoss 模块。
+
+        参数:
+            device (torch.device): 张量操作的设备。
+            nc (int): 类别数量。
+            teacher_class_indexes (list 或 None): 要进行蒸馏的教师模型的类别索引列表。
+                                                  如果为 None，则使用所有类别。
+            reg_max (int): 用于边界框回归的正则化最大值，用于确定通道分割。
+            temperature (float, 可选): KL散度的温度。默认为 1.0。
+            reduction (str, 可选): KL散度的规约方法 ('batchmean', 'sum'等)。
+                                      默认为 'batchmean'。
+        """
+        super().__init__()
+        self.device = device
+        self.nc = nc
+        self.reg_max_channels = reg_max * 4  # bounding box 分布的通道数
+
+        # 处理 teacherClassIndexes
+        self.teacher_class_indexes = teacher_class_indexes
+        if self.teacher_class_indexes is not None:
+            if not isinstance(self.teacher_class_indexes, torch.Tensor):
+                self.teacher_class_indexes = torch.tensor(self.teacher_class_indexes, dtype=torch.long)
+            # teacher_class_indexes 会在 forward 中根据 logits 的设备进行 .to(device) 操作
+
+        # 实例化 KLDivergenceLoss
+        self.kl_loss_calculator = KLDivergenceLoss(temperature=temperature, reduction=reduction)
+
+    def forward(self, student_responses_list, teacher_responses_list):
+        """
+        计算基于响应的蒸馏损失。
+
+        参数:
+            student_responses_list (list of torch.Tensor): 学生模型的响应张量列表 (来自检测头)。
+                每个张量的形状: (Batch, regMax*4 + NumClasses, Height, Width)。
+            teacher_responses_list (list of torch.Tensor): 教师模型的响应张量列表，格式相同。
+
+        返回:
+            torch.Tensor: 在所有有效层级上计算的平均KL散度损失。
+        """
+        total_kl_loss = torch.tensor(0.0, device=self.device)
+        valid_levels_count = 0
+
+        for s_resp, t_resp in zip(student_responses_list, teacher_responses_list):
+            if s_resp is None or t_resp is None or s_resp.numel() == 0 or t_resp.numel() == 0:
+                continue
+
+            # s_resp 形状: (B, C, H, W)，其中 C = reg_max_channels + nc
+            # 从组合的响应张量中提取类别 logits 部分
+            try:
+                # 类别 logits 是最后 'self.nc' 个通道
+                s_class_logits_map = s_resp.split((self.reg_max_channels, self.nc), dim=1)[1]
+                t_class_logits_map = t_resp.split((self.reg_max_channels, self.nc), dim=1)[1]
+            except RuntimeError as e:
+                print(f"警告: ResponseLoss 无法分割响应通道。学生响应形状: {s_resp.shape}, "
+                      f"教师响应形状: {t_resp.shape}, 期望分割: ({self.reg_max_channels}, {self.nc})。错误: {e}")
+                continue
+
+            # 为 KLDivergenceLoss 重塑形状: (Batch*Height*Width, NumClasses)
+            b, _, h, w = s_class_logits_map.shape
+            s_logits_flat = s_class_logits_map.permute(0, 2, 3, 1).contiguous().view(-1, self.nc)
+            t_logits_flat = t_class_logits_map.permute(0, 2, 3, 1).contiguous().view(-1, self.nc)
+
+            current_target_device = s_logits_flat.device # 确保索引与 logits 在同一设备上
+
+            # 如果指定了 teacher_class_indexes，则应用它
+            if self.teacher_class_indexes is not None:
+                if self.teacher_class_indexes.device != current_target_device:
+                    self.teacher_class_indexes = self.teacher_class_indexes.to(current_target_device)
+
+                s_logits_selected = s_logits_flat[:, self.teacher_class_indexes]
+                t_logits_selected = t_logits_flat[:, self.teacher_class_indexes]
+            else:
+                s_logits_selected = s_logits_flat
+                t_logits_selected = t_logits_flat
+
+            if s_logits_selected.numel() == 0 or t_logits_selected.numel() == 0:
+                continue
+
+            level_loss = self.kl_loss_calculator(s_logits_selected, t_logits_selected)
+            total_kl_loss += level_loss
+            valid_levels_count += 1
+
+        if valid_levels_count > 0:
+            return total_kl_loss / valid_levels_count
+        else:
+            return total_kl_loss # 如果没有有效层级，则返回 0.0
