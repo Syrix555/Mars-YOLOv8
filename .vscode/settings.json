@@ -1,5 +1,5 @@
 {
-    "python.defaultInterpreterPath": "D:anaconda/python.exe",
+    "python.defaultInterpreterPath": "D:\\miniconda3\\envs\\yolov8\\python.exe",
 
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.formatOnSave": true,
