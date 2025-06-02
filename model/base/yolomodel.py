@@ -7,7 +7,6 @@ from model.base.backbone import Backbone
 from model.base.neck import Neck
 from model.base.head import DetectHead
 from model.base.swin_transformer import SwinTransformer
-from model.base.ema import ModelEMA
 
 
 class YoloModelPhaseSetup(object):
@@ -56,16 +55,6 @@ class YoloModel(nn.Module):
             log.inf("Using Swin Transformer as backbone...")
         self.neck = Neck(w, r, n)
         self.head = DetectHead(w, r, self.mcfg.nc, self.mcfg.regMax)
-
-        # EMA initialization
-        if hasattr(mcfg, 'useEMA') and mcfg.useEMA:
-            self.ema = ModelEMA(
-                model=self,
-                decay=getattr(mcfg, 'ema_decay', 0.9999),
-                updates=0
-            )
-            if hasattr(self.mcfg, 'device') and self.ema:
-                 self.ema.get_model_for_eval().to(self.mcfg.device)
 
         # model static data
         self.layerStrides = [8, 16, 32]

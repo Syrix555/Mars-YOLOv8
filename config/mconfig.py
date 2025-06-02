@@ -29,9 +29,6 @@ class ModelConfig(object):
         # Backbone / Swin-Transformer
         self.useBone = "backbone"
 
-        # EMA switch
-        self.useEMA = False
-
         # distillation model setup
         self.teacherModelFile = None
         self.distilLossWeights = None

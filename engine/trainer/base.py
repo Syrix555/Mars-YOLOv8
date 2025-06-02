@@ -101,9 +101,6 @@ class MarsBaseTrainer(object):
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             optimizer.step()
 
-            if model.ema:
-                model.update_ema()
-
             trainLoss += stepLoss.item()
             progressBar.set_postfix(trainLossPerBatch=trainLoss / (batchIndex + 1), backboneFreezed=self.backboneFreezed)
             progressBar.update(1)

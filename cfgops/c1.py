@@ -4,11 +4,13 @@ from config import mconfig
 
 def mcfg(tags):
     mcfg = mconfig.ModelConfig()
-    # projectRootDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # pretrainedFile = os.path.join(projectRootDir, "resources/pretrained/backbone", "backbone_{}.pth".format(mcfg.phase))
-    # mcfg.pretrainedBackboneUrl = "file://{}".format(pretrainedFile)
+    projectRootDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pretrainedFile = os.path.join(projectRootDir, "resources/pretrained/backbone", "backbone_{}.pth".format(mcfg.phase))
+    mcfg.pretrainedBackboneUrl = "file://{}".format(pretrainedFile)
 
     mcfg.useBone = "swin"
+    if mcfg.useBone == "swin":
+        mcfg.pretrainedBackboneUrl = None           #swin-transformer的参数无法与预训练模型中的backbone参数共享，不能加载权重
 
     mcfg.phase = "nano" # DO NOT MODIFY
     mcfg.trainSplitName = "train" # DO NOT MODIFY

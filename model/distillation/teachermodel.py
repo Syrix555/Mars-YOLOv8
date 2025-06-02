@@ -11,7 +11,10 @@ class YoloTeacherModel(YoloModel):
     @override
     def forward(self, x):
         with torch.no_grad():
-            feat0, feat1, feat2, feat3 = self.backbone.forward(x)
+            if self.mcfg.useBone == "backbone":
+                feat0, feat1, feat2, feat3 = self.backbone.forward(x)
+            elif self.mcfg.useBone == "swin":
+                feat0, feat1, feat2, feat3 = self.swinTransformer.forward(x)
             C, X, Y, Z = self.neck.forward(feat1, feat2, feat3)
             xo, yo, zo = self.head.forward(X, Y, Z)
         return xo, yo, zo, feat0, feat1, feat2, feat3, C, X, Y, Z
