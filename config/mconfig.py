@@ -26,6 +26,12 @@ class ModelConfig(object):
         self.inputShape = (640, 640)
         self.regMax = 16
 
+        # Backbone / Swin-Transformer
+        self.useBone = "backbone"
+
+        # EMA switch
+        self.useEMA = False
+
         # distillation model setup
         self.teacherModelFile = None
         self.distilLossWeights = None
@@ -38,7 +44,7 @@ class ModelConfig(object):
         self.maxEpoch = 200
         self.backboneFreezeEpochs = []
         self.distilEpochs = []
-        self.batchSize = 32
+        self.batchSize = 16
         self.optimizerType = "SGD"
         self.optimizerMomentum = 0.937
         self.optimizerWeightDecay = 5e-4

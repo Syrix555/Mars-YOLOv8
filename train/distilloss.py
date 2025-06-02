@@ -7,14 +7,14 @@ class DistillationDetectionLoss(object):
         self.mcfg = mcfg
         self.histMode = False
         self.detectionLoss = DetectionLoss(mcfg, model)
-        # self.cwdLoss = CWDLoss(self.mcfg.device)
-        cwd_temperature = getattr(mcfg, 'cwd_temperature', 1.0)  # 从mcfg获取温度，若无则默认为1.0
-        cwd_spatial_kl_reduction = getattr(mcfg, 'cwd_spatial_kl_reduction', 'batchmean') # 从mcfg获取，若无则用默认值
+        self.cwdLoss = CWDLoss(self.mcfg.device)
+        # cwd_temperature = getattr(mcfg, 'cwd_temperature', 1.0)  # 从mcfg获取温度，若无则默认为1.0
+        # cwd_spatial_kl_reduction = getattr(mcfg, 'cwd_spatial_kl_reduction', 'batchmean') # 从mcfg获取，若无则用默认值
 
-        self.cwdLoss = CWDLoss(
-            temperature=cwd_temperature,
-            spatial_kl_reduction=cwd_spatial_kl_reduction
-        )
+        # self.cwdLoss = CWDLoss(
+        #     temperature=cwd_temperature,
+        #     spatial_kl_reduction=cwd_spatial_kl_reduction
+        # )
         self.respLoss = ResponseLoss(self.mcfg.device, self.mcfg.nc, self.mcfg.teacherClassIndexes, self.mcfg.regMax)
 
         # raise NotImplementedError("DistillationDetectionLoss::__init__")

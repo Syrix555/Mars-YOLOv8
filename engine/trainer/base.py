@@ -71,10 +71,16 @@ class MarsBaseTrainer(object):
     def preEpochSetup(self, model, epoch):
         if self.mcfg.backboneFreezeEpochs is not None:
             if epoch in self.mcfg.backboneFreezeEpochs:
-                model.freezeBackbone()
+                if self.mcfg.useBone == "backbone":
+                    model.freezeBackbone()
+                elif self.mcfg.useBone == "swin":
+                    model.freezeSwinTransformer()
                 self.backboneFreezed = True
             else:
-                model.unfreezeBackbone()
+                if self.mcfg.useBone == "backbone":
+                    model.unfreezeBackbone()
+                elif self.mcfg.useBone == "swin":
+                    model.unfreezeSwinTransformer()
                 self.backboneFreezed = False
 
     def fitOneEpoch(self, model, loss, dataLoader, optimizer, epoch):
@@ -94,6 +100,9 @@ class MarsBaseTrainer(object):
             stepLoss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)
             optimizer.step()
+
+            if model.ema:
+                model.update_ema()
 
             trainLoss += stepLoss.item()
             progressBar.set_postfix(trainLossPerBatch=trainLoss / (batchIndex + 1), backboneFreezed=self.backboneFreezed)

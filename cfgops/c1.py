@@ -8,6 +8,8 @@ def mcfg(tags):
     # pretrainedFile = os.path.join(projectRootDir, "resources/pretrained/backbone", "backbone_{}.pth".format(mcfg.phase))
     # mcfg.pretrainedBackboneUrl = "file://{}".format(pretrainedFile)
 
+    mcfg.useBone = "swin"
+
     mcfg.phase = "nano" # DO NOT MODIFY
     mcfg.trainSplitName = "train" # DO NOT MODIFY
     mcfg.validationSplitName = "validation" # DO NOT MODIFY

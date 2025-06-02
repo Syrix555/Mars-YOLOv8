@@ -42,21 +42,6 @@ class Backbone(nn.Module):
         self.s4_c2f = C2f(ch_s4_out, ch_s4_out, n=n, shortcut=True, e=0.5)
         self.sppf = SPPF(ch_s4_out, ch_s4_out, k=5)
 
-        # "增加"的部分：调用权重初始化方法
-        self._initialize_weights()
-
-    # "增加"的部分：权重初始化方法
-    def _initialize_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                # 你的Conv模块中 nn.Conv2d 的 bias=False
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu') # SiLU激活函数特性接近ReLU
-            elif isinstance(m, nn.BatchNorm2d):
-                if m.weight is not None: # 确保权重存在 (affine=True时)
-                    nn.init.constant_(m.weight, 1)
-                if m.bias is not None: # 确保偏置存在 (affine=True时)
-                    nn.init.constant_(m.bias, 0)
-            # 可以为其他类型的层（如nn.Linear, 如果存在）添加初始化逻辑
         # raise NotImplementedError("Backbone::__init__")
 
     def forward(self, x):

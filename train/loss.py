@@ -214,14 +214,13 @@ class DetectionLoss(object):
             return torch.cat((x1y1, x2y2), dim=-1)  # xyxy
 
 class CWDLoss(nn.Module):
-    def __init__(self,
-                 temperature: float = 1.0,
-                 spatial_kl_reduction: str = 'batchmean'):
+    def __init__(self, device): # 只接收 device 参数
         super().__init__()
-        self.temperature = temperature
-        self.kl_div_loss = nn.KLDivLoss(reduction=spatial_kl_reduction)
-        # print(f"CWDLoss initialized with: temperature={temperature}, "
-        #       f"spatial_kl_reduction='{spatial_kl_reduction}'")
+        self.device = device # 存储 device
+        # spatial_kl_reduction 在内部固定，例如使用 'batchmean'
+        self.kl_div_loss = nn.KLDivLoss(reduction='batchmean')
+        # print(f"CWDLoss 初始化参数: device='{device}', "
+        #       f"spatial_kl_reduction='batchmean' (hardcoded)")
 
     def _resize_if_needed(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor) -> torch.Tensor:
         if student_feat.shape[2:] != teacher_feat.shape[2:]:
@@ -234,24 +233,21 @@ class CWDLoss(nn.Module):
     def forward(self,
                 student_features_list: list[torch.Tensor],
                 teacher_features_list: list[torch.Tensor]) -> torch.Tensor:
-        # Determine device from the first valid tensor in student_features_list or teacher_features_list
-        device = 'cpu' # Default device
+        current_device = self.device
         if student_features_list and student_features_list[0] is not None:
-            device = student_features_list[0].device
+            current_device = student_features_list[0].device
         elif teacher_features_list and teacher_features_list[0] is not None:
-            device = teacher_features_list[0].device
+            current_device = teacher_features_list[0].device
 
         if not student_features_list:
-            return torch.tensor(0.0, device=device)
+            return torch.tensor(0.0, device=current_device)
 
-        total_cwd_loss = torch.tensor(0.0, device=device)
+        total_cwd_loss = torch.tensor(0.0, device=current_device)
 
         if not teacher_features_list:
             return total_cwd_loss
 
         if len(student_features_list) != len(teacher_features_list):
-            # print(f"  Warning (CWDLoss): 学生 ({len(student_features_list)}) 和教师 ({len(teacher_features_list)}) "
-            #       f"特征层级数量不匹配。跳过CWD计算。")
             return total_cwd_loss
 
         num_valid_levels = 0
@@ -269,25 +265,24 @@ class CWDLoss(nn.Module):
             if C_s == 0: continue
             if H_s * W_s == 0: continue
 
-
             t_feat_aligned = self._resize_if_needed(s_feat, t_feat)
             s_feat_flat = s_feat.view(B_s, C_s, H_s * W_s)
             t_feat_flat = t_feat_aligned.view(B_t, C_s, H_s * W_s)
 
-            log_student_spatial_dist = F.log_softmax(s_feat_flat / self.temperature, dim=2)
-            teacher_spatial_dist = F.softmax(t_feat_flat / self.temperature, dim=2)
+            log_student_spatial_dist = F.log_softmax(s_feat_flat, dim=2)
+            teacher_spatial_dist = F.softmax(t_feat_flat, dim=2)
 
             kl_loss_per_level = self.kl_div_loss(
                 log_student_spatial_dist.view(-1, H_s * W_s),
                 teacher_spatial_dist.view(-1, H_s * W_s)
             )
-            total_cwd_loss += kl_loss_per_level * (self.temperature ** 2)
+            total_cwd_loss += kl_loss_per_level
             num_valid_levels += 1
 
         if num_valid_levels > 0:
             final_loss = total_cwd_loss / num_valid_levels
         else:
-            final_loss = total_cwd_loss # 保持为0
+            final_loss = total_cwd_loss
         return final_loss
 
 class KLDivergenceLoss(nn.Module):
