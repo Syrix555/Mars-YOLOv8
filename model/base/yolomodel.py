@@ -126,7 +126,7 @@ class YoloModel(nn.Module):
             log.yellow("Unexpected keys found in model url, ignored:\nunexpected={}\nurl={}".format(unexpectedKeys, url))
         if len(missingKeys) > 0:
             log.red("Missing keys in model url:\nmissing={}\nurl={}".format(missingKeys, url))
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
         else:
             log.grey("Pretrained backbone weights loaded from url: {}".format(url))
 
@@ -137,6 +137,6 @@ class YoloModel(nn.Module):
             log.yellow("Unexpected keys found in model file, ignored:\nunexpected={}\nurl={}".format(unexpectedKeys, modelFile))
         if len(missingKeys) > 0:
             log.red("Missing keys in model file:\nmissing={}\nurl={}".format(missingKeys, modelFile))
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
         else:
             log.grey("Yolo model loaded from file: {}".format(modelFile))

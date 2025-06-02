@@ -45,6 +45,6 @@ class YoloStudentModel(YoloModel):
             log.yellow("Unexpected keys found in model file, ignored:\nunexpected={}\nurl={}".format(unexpectedKeys, modelFile))
         if len(missingKeys) > 0:
             log.red("Missing keys in model file:\nmissing={}\nurl={}".format(missingKeys, modelFile))
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
         else:
             log.grey("Yolo student model loaded from file: {}".format(modelFile))

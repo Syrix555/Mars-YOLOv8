@@ -14,3 +14,4 @@ dist
 CMakeLists.txt
 dask-worker-space
 eval
+yolov8.zip

@@ -52,4 +52,4 @@ outputFile = os.path.join(splitsDir, "ofn20.txt")
 with open(outputFile, "w") as f:
     f.writelines(["{}\n".format(x) for x in filteredImages])
 
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()

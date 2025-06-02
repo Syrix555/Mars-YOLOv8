@@ -72,6 +72,6 @@ with open(outputFile, "w") as f:
 
 print(len(c10New))
 
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
 
 # c10NewImages =

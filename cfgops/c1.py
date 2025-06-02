@@ -4,9 +4,9 @@ from config import mconfig
 
 def mcfg(tags):
     mcfg = mconfig.ModelConfig()
-    projectRootDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    pretrainedFile = os.path.join(projectRootDir, "resources/pretrained/backbone", "backbone_{}.pth".format(mcfg.phase))
-    mcfg.pretrainedBackboneUrl = "file://{}".format(pretrainedFile)
+    # projectRootDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # pretrainedFile = os.path.join(projectRootDir, "resources/pretrained/backbone", "backbone_{}.pth".format(mcfg.phase))
+    # mcfg.pretrainedBackboneUrl = "file://{}".format(pretrainedFile)
 
     mcfg.phase = "nano" # DO NOT MODIFY
     mcfg.trainSplitName = "train" # DO NOT MODIFY

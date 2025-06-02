@@ -29,12 +29,12 @@ class Backbone(nn.Module):
         # Stage 2 (产生 feat1)
         ch_s2_out = scale_channels(256, w)
         self.s2_conv = Conv(ch_s1_out, ch_s2_out, self.kernelSize, self.stride, p=1)
-        self.s2_c2f = C2f(ch_s2_out, ch_s2_out, n=n, shortcut=True, e=0.5)
+        self.s2_c2f = C2f(ch_s2_out, ch_s2_out, n=r, shortcut=True, e=0.5)
 
         # Stage 3 (产生 feat2)
         ch_s3_out = scale_channels(512, w)
         self.s3_conv = Conv(ch_s2_out, ch_s3_out, self.kernelSize, self.stride, p=1)
-        self.s3_c2f = C2f(ch_s3_out, ch_s3_out, n=n, shortcut=True, e=0.5)
+        self.s3_c2f = C2f(ch_s3_out, ch_s3_out, n=r, shortcut=True, e=0.5)
 
         # Stage 4 (产生 feat3)
         ch_s4_out = scale_channels(512, w, r)

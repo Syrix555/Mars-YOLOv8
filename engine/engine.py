@@ -34,4 +34,4 @@ class MarsEngine(object):
     def view(self, evalDf):
         log.inf("Evaluation result:\n{}".format(evalDf))
         log.inf("mAP={:.3f}".format(evalDf["AP"].mean()))
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()

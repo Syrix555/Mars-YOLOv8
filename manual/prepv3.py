@@ -56,4 +56,4 @@ with open("/auto/cvdata/mar20/splits/v3/test.txt", "w") as f:
         f.write("{}\n".format(img))
 
 
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
